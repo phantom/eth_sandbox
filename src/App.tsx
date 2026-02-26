@@ -35,8 +35,38 @@ declare global {
   }
 }
 let accounts = [];
-const message = 'To avoid digital dognappers, sign below to authenticate with CryptoCorgis.';
+const message = 'To avoid digital dognappers...';
 const sleep = (timeInMS) => new Promise((resolve) => setTimeout(resolve, timeInMS));
+  const NETWORKS = {
+  ethereum: {
+    chainId: '0x1',
+    chainName: 'Ethereum Mainnet',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: ['https://mainnet.infura.io/v3/'],
+    blockExplorerUrls: ['https://etherscan.io'],
+  },
+  polygon: {
+    chainId: '0x89',
+    chainName: 'Polygon Mainnet',
+    nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+    rpcUrls: ['https://polygon-rpc.com'],
+    blockExplorerUrls: ['https://polygonscan.com'],
+  },
+  sepolia: {
+    chainId: '0xaa36a7',
+    chainName: 'Sepolia Testnet',
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpcUrls: ['https://rpc.sepolia.org'],
+    blockExplorerUrls: ['https://sepolia.etherscan.io'],
+  },
+  mumbai: {
+    chainId: '0x13881',
+    chainName: 'Polygon Mumbai Testnet',
+    nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+    rpcUrls: ['https://rpc-mumbai.maticvigil.com'],
+    blockExplorerUrls: ['https://mumbai.polygonscan.com'],
+  },
+};
 
 // =============================================================================
 // Typedefs
@@ -210,6 +240,51 @@ const useProps = (): Props => {
     }
   }, [provider, createLog]);
 
+  const handleSwitchNetwork = useCallback(async (networkKey: string) => {
+  if (!provider) return;
+  const network = NETWORKS[networkKey];
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: network.chainId }],
+    });
+    createLog({
+      status: 'success',
+      method: 'eth_sendTransaction',
+      message: `Switched to ${network.chainName}!`,
+    });
+  } catch (error) {
+    if (error.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [network],
+        });
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: network.chainId }],
+        });
+        createLog({
+          status: 'success',
+          method: 'eth_sendTransaction',
+          message: `${network.chainName} added and switched successfully!`,
+        });
+      } catch (addError: any) {
+        createLog({
+          status: 'error',
+          method: 'eth_sendTransaction',
+          message: addError.message,
+        });
+      }
+    } else {
+      createLog({
+        status: 'error',
+        method: 'eth_sendTransaction',
+        message: error.message,
+      });
+    }
+  }
+}, [provider, createLog]);
   /** Connect */
   const handleConnect = useCallback(async () => {
     if (!provider) return;
@@ -231,22 +306,37 @@ const useProps = (): Props => {
   }, [provider, createLog, accounts]);
 
   const connectedMethods = useMemo(() => {
-    return [
-      {
-        name: 'Send Transaction',
-        onClick: handleEthSendTransaction,
-      },
-      {
-        name: 'Sign Message',
-        onClick: handleSignMessage,
-      },
-      {
-        name: 'Reconnect',
-        onClick: handleConnect,
-      },
-    ];
-  }, [handleEthSendTransaction, handleSignMessage]);
-
+  return [
+    {
+      name: 'Send Transaction',
+      onClick: handleEthSendTransaction,
+    },
+    {
+      name: 'Sign Message',
+      onClick: handleSignMessage,
+    },
+    {
+      name: 'Reconnect',
+      onClick: handleConnect,
+    },
+    {
+      name: 'Switch to Ethereum',
+      onClick: () => handleSwitchNetwork('ethereum'),
+    },
+    {
+      name: 'Switch to Polygon',
+      onClick: () => handleSwitchNetwork('polygon'),
+    },
+    {
+      name: 'Switch to Sepolia',
+      onClick: () => handleSwitchNetwork('sepolia'),
+    },
+    {
+      name: 'Switch to Mumbai',
+      onClick: () => handleSwitchNetwork('mumbai'),
+    },
+  ];
+}, [handleEthSendTransaction, handleSignMessage, handleConnect, handleSwitchNetwork]);
   return {
     address: accounts[0],
     connectedMethods,
